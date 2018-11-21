@@ -1,0 +1,880 @@
+GAMS 25.1.2  r67455 Released Aug  1, 2018 DEX-DEG x86 64bit/Mac OS X - 11/20/18 17:51:11 Page 1
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+   1  option limrow = 10
+   2   
+   3  Sets
+   4      N "all nodes" /A, B, C, D, E, F, G, H, I, J/
+   5      T(N) "transfer nodes" /E, F, I/
+   6      K "vehicles" /1, 2/
+   7      R "orders" /1, 2, 3/;
+   8   
+   9  alias(N,N_,N_p);
+  10   
+  11  Sets
+  12      o(K,N)      "starting depot"
+  13      /   1.A
+  14          2.A   /
+  15      o_(K,N)     "end depot"
+  16      /   1.G
+  17          2.G   /
+  18      p(R,N)      "pick up location"
+  19      /   1.B
+  20          2.D
+  21          3.E   /
+  22      d(R,N)      "drop off location"
+  23      /   1.F
+  24          2.J
+  25          3.C   /;
+  26   
+  27  Parameters
+  28      u(K)        "vehicle carring capacity"
+  29      /   1   6
+  30          2   3   /
+  31      q(R)        "order amount"
+  32      /   1   3
+  33          2   2
+  34          3   4   /;
+  35   
+  36  Table
+  37      c(N, N_, K) "travelling cost"
+  38                  1   2
+  39          A.  B   1   3
+  40          A.  E   6   3
+  41          A.  D   2   1
+  42          B.  C   8   4
+  43          B.  F   16  3
+  44          B.  E   1   1
+  45          C.  G   1   2
+  46          D.  E   2   1
+  47          D.  H   2   1
+  48          E.  F   10  5
+  49          E.  I   2   1
+  50          F.  C   1   2
+  51          F.  G   6   3
+  52          F.  J   2   1
+  53          F.  E   2   1
+  54          H.  E   2   1
+  55          H.  I   12  10
+  56          I.  F   2   1
+  57          I.  J   6   3
+  58          J.  G   4   2
+  59  ;
+  60   
+  61  Set A(N,N_)     "available arcs";
+  62  A(N,N_) = yes$( c(N,N_,'1') <> 0 );
+  63   
+  64  Binary Variables
+  65      x(N,N_,K)       "if a car K travels in arc A"
+  66      y(N,N_,K,R)     "if a car K travels in arc A carries order R"
+  67  ;
+  68   
+  69  variables
+  70      obj "total cost";
+  71   
+  72  Equations
+  73      cost            "total cost"
+  74      eq1(N,K)        "each K initiate once from original depot"
+  75      eq2(N,N_,K)     "each K must end at its end depot"
+  76      eq3(N,K)        "flow conservation through the nodes"
+  77      eq4(R,N)     "requests are picked up"
+  78      eq5(R,N)     "requests are delivered"
+  79      eq6(R,T)     "transshipment node switch"
+  80      eq7(K,R,N)   "same request flow conservation"
+  81      eq8(N,N_,K,R)     "x>y"
+  82      eq9(N,N_,K)     "vehicle capacity is respected"
+  83  ;
+  84   
+  85  cost..                  obj =e= sum(K,sum((N,N_)$(A(N,N_)),c(N,N_,K)*x(N,N_,K)));
+  86  eq1(N,K)$(o(K,N))..     sum(N_$(A(N,N_)),x(N,N_,K)) =l= 1;
+  87  eq2(N,N_,K)$(o(K,N) and o_(K,N_))..         sum(N_p$(A(N,N_p)),x(N,N_p,K)) =e= sum(N_p$(A(N_p,N_)),x(N_p,N_,K));
+  88  eq3(N,K)$((not o(K,N)) and (not o_(K,N))).. sum(N_$(A(N,N_)),x(N,N_,K)) =e= sum(N_$(A(N_,N)),x(N_,N,K));
+  89  eq4(R,N)$(p(R,N))..     sum((K,N_)$(A(N,N_)),y(N,N_,K,R)) =e= 1;
+  90  eq5(R,N)$(d(R,N))..     sum((K,N_)$(A(N_,N)),y(N_,N,K,R)) =e= 1;
+  91  eq6(R,T).. sum((K,N_)$(A(T,N_)),y(T,N_,K,R)) + 1$(d(R,T)) =e= sum((K,N_)$(A(N_,T)),y(N_,T,K,R)) + 1$(p(R,T));
+  92  eq7(K,R,N)$((not p(R,N)) and (not d(R,N)) and (not T(N))).. sum(N_$(A(N,N_)),y(N,N_,K,R)) =e= sum(N_$(A(N_,N)),y(N_,N,K,R));
+  93  eq8(N,N_,K,R)$(A(N,N_)).. y(N,N_,K,R) =l= x(N,N_,K);
+  94  eq9(N,N_,K)$(A(N,N_)).. sum(R,q(R)*y(N,N_,K,R)) =l= u(K)*x(N,N_,K);
+  95   
+  96  Model transport /cost eq1 eq2 eq3 eq4 eq5 eq6 eq7 eq8 eq9/ ;
+  97   
+  98  Option MIP=CPLEX;
+  99  Option optca=0;
+ 100  Option optcr=0;
+ 101   
+ 102  Solve transport using MIP minimizing obj ;
+ 103   
+ 104   
+ 105   
+
+
+COMPILATION TIME     =        0.001 SECONDS      3 MB  25.1.2 r67455 DEX-DEG
+GAMS 25.1.2  r67455 Released Aug  1, 2018 DEX-DEG x86 64bit/Mac OS X - 11/20/18 17:51:11 Page 2
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Equation Listing    SOLVE transport Using MIP From line 102
+
+
+---- cost  =E=  total cost
+
+cost..  - x(A,B,1) - 3*x(A,B,2) - 2*x(A,D,1) - x(A,D,2) - 6*x(A,E,1) - 3*x(A,E,2) - 8*x(B,C,1) - 4*x(B,C,2) - x(B,E,1) - x(B,E,2) - 16*x(B,F,1) - 3*x(B,F,2) - x(C,G,1) - 2*x(C,G,2) - 2*x(D,E,1) - x(D,E,2) - 2*x(D,H,1) - x(D,H,2) - 10*x(E,F,1) - 5*x(E,F,2)
+     
+      - 2*x(E,I,1) - x(E,I,2) - x(F,C,1) - 2*x(F,C,2) - 2*x(F,E,1) - x(F,E,2) - 6*x(F,G,1) - 3*x(F,G,2) - 2*x(F,J,1) - x(F,J,2) - 2*x(H,E,1) - x(H,E,2) - 12*x(H,I,1) - 10*x(H,I,2) - 2*x(I,F,1) - x(I,F,2) - 6*x(I,J,1) - 3*x(I,J,2) - 4*x(J,G,1) - 2*x(J,G,2)
+     
+      + obj =E= 0 ; (LHS = 0)
+     
+
+---- eq1  =L=  each K initiate once from original depot
+
+eq1(A,1)..  x(A,B,1) + x(A,D,1) + x(A,E,1) =L= 1 ; (LHS = 0)
+     
+eq1(A,2)..  x(A,B,2) + x(A,D,2) + x(A,E,2) =L= 1 ; (LHS = 0)
+     
+
+---- eq2  =E=  each K must end at its end depot
+
+eq2(A,G,1)..  x(A,B,1) + x(A,D,1) + x(A,E,1) - x(C,G,1) - x(F,G,1) - x(J,G,1) =E= 0 ; (LHS = 0)
+     
+eq2(A,G,2)..  x(A,B,2) + x(A,D,2) + x(A,E,2) - x(C,G,2) - x(F,G,2) - x(J,G,2) =E= 0 ; (LHS = 0)
+     
+
+---- eq3  =E=  flow conservation through the nodes
+
+eq3(B,1)..  - x(A,B,1) + x(B,C,1) + x(B,E,1) + x(B,F,1) =E= 0 ; (LHS = 0)
+     
+eq3(B,2)..  - x(A,B,2) + x(B,C,2) + x(B,E,2) + x(B,F,2) =E= 0 ; (LHS = 0)
+     
+eq3(C,1)..  - x(B,C,1) + x(C,G,1) - x(F,C,1) =E= 0 ; (LHS = 0)
+     
+eq3(C,2)..  - x(B,C,2) + x(C,G,2) - x(F,C,2) =E= 0 ; (LHS = 0)
+     
+eq3(D,1)..  - x(A,D,1) + x(D,E,1) + x(D,H,1) =E= 0 ; (LHS = 0)
+     
+eq3(D,2)..  - x(A,D,2) + x(D,E,2) + x(D,H,2) =E= 0 ; (LHS = 0)
+     
+eq3(E,1)..  - x(A,E,1) - x(B,E,1) - x(D,E,1) + x(E,F,1) + x(E,I,1) - x(F,E,1) - x(H,E,1) =E= 0 ; (LHS = 0)
+     
+eq3(E,2)..  - x(A,E,2) - x(B,E,2) - x(D,E,2) + x(E,F,2) + x(E,I,2) - x(F,E,2) - x(H,E,2) =E= 0 ; (LHS = 0)
+     
+eq3(F,1)..  - x(B,F,1) - x(E,F,1) + x(F,C,1) + x(F,E,1) + x(F,G,1) + x(F,J,1) - x(I,F,1) =E= 0 ; (LHS = 0)
+     
+eq3(F,2)..  - x(B,F,2) - x(E,F,2) + x(F,C,2) + x(F,E,2) + x(F,G,2) + x(F,J,2) - x(I,F,2) =E= 0 ; (LHS = 0)
+     
+REMAINING 6 ENTRIES SKIPPED
+
+
+---- eq4  =E=  requests are picked up
+
+eq4(1,B)..  y(B,C,1,1) + y(B,C,2,1) + y(B,E,1,1) + y(B,E,2,1) + y(B,F,1,1) + y(B,F,2,1) =E= 1 ; (LHS = 0, INFES = 1 ****)
+     
+eq4(2,D)..  y(D,E,1,2) + y(D,E,2,2) + y(D,H,1,2) + y(D,H,2,2) =E= 1 ; (LHS = 0, INFES = 1 ****)
+     
+eq4(3,E)..  y(E,F,1,3) + y(E,F,2,3) + y(E,I,1,3) + y(E,I,2,3) =E= 1 ; (LHS = 0, INFES = 1 ****)
+     
+
+---- eq5  =E=  requests are delivered
+
+eq5(1,F)..  y(B,F,1,1) + y(B,F,2,1) + y(E,F,1,1) + y(E,F,2,1) + y(I,F,1,1) + y(I,F,2,1) =E= 1 ; (LHS = 0, INFES = 1 ****)
+     
+eq5(2,J)..  y(F,J,1,2) + y(F,J,2,2) + y(I,J,1,2) + y(I,J,2,2) =E= 1 ; (LHS = 0, INFES = 1 ****)
+     
+eq5(3,C)..  y(B,C,1,3) + y(B,C,2,3) + y(F,C,1,3) + y(F,C,2,3) =E= 1 ; (LHS = 0, INFES = 1 ****)
+     
+
+---- eq6  =E=  transshipment node switch
+
+eq6(1,E)..  - y(A,E,1,1) - y(A,E,2,1) - y(B,E,1,1) - y(B,E,2,1) - y(D,E,1,1) - y(D,E,2,1) + y(E,F,1,1) + y(E,F,2,1) + y(E,I,1,1) + y(E,I,2,1) - y(F,E,1,1) - y(F,E,2,1) - y(H,E,1,1) - y(H,E,2,1) =E= 0 ; (LHS = 0)
+     
+eq6(1,F)..  - y(B,F,1,1) - y(B,F,2,1) - y(E,F,1,1) - y(E,F,2,1) + y(F,C,1,1) + y(F,C,2,1) + y(F,E,1,1) + y(F,E,2,1) + y(F,G,1,1) + y(F,G,2,1) + y(F,J,1,1) + y(F,J,2,1) - y(I,F,1,1) - y(I,F,2,1) =E= -1 ; (LHS = 0, INFES = 1 ****)
+     
+eq6(1,I)..  - y(E,I,1,1) - y(E,I,2,1) - y(H,I,1,1) - y(H,I,2,1) + y(I,F,1,1) + y(I,F,2,1) + y(I,J,1,1) + y(I,J,2,1) =E= 0 ; (LHS = 0)
+     
+eq6(2,E)..  - y(A,E,1,2) - y(A,E,2,2) - y(B,E,1,2) - y(B,E,2,2) - y(D,E,1,2) - y(D,E,2,2) + y(E,F,1,2) + y(E,F,2,2) + y(E,I,1,2) + y(E,I,2,2) - y(F,E,1,2) - y(F,E,2,2) - y(H,E,1,2) - y(H,E,2,2) =E= 0 ; (LHS = 0)
+     
+eq6(2,F)..  - y(B,F,1,2) - y(B,F,2,2) - y(E,F,1,2) - y(E,F,2,2) + y(F,C,1,2) + y(F,C,2,2) + y(F,E,1,2) + y(F,E,2,2) + y(F,G,1,2) + y(F,G,2,2) + y(F,J,1,2) + y(F,J,2,2) - y(I,F,1,2) - y(I,F,2,2) =E= 0 ; (LHS = 0)
+     
+eq6(2,I)..  - y(E,I,1,2) - y(E,I,2,2) - y(H,I,1,2) - y(H,I,2,2) + y(I,F,1,2) + y(I,F,2,2) + y(I,J,1,2) + y(I,J,2,2) =E= 0 ; (LHS = 0)
+     
+eq6(3,E)..  - y(A,E,1,3) - y(A,E,2,3) - y(B,E,1,3) - y(B,E,2,3) - y(D,E,1,3) - y(D,E,2,3) + y(E,F,1,3) + y(E,F,2,3) + y(E,I,1,3) + y(E,I,2,3) - y(F,E,1,3) - y(F,E,2,3) - y(H,E,1,3) - y(H,E,2,3) =E= 1 ; (LHS = 0, INFES = 1 ****)
+     
+eq6(3,F)..  - y(B,F,1,3) - y(B,F,2,3) - y(E,F,1,3) - y(E,F,2,3) + y(F,C,1,3) + y(F,C,2,3) + y(F,E,1,3) + y(F,E,2,3) + y(F,G,1,3) + y(F,G,2,3) + y(F,J,1,3) + y(F,J,2,3) - y(I,F,1,3) - y(I,F,2,3) =E= 0 ; (LHS = 0)
+     
+eq6(3,I)..  - y(E,I,1,3) - y(E,I,2,3) - y(H,I,1,3) - y(H,I,2,3) + y(I,F,1,3) + y(I,F,2,3) + y(I,J,1,3) + y(I,J,2,3) =E= 0 ; (LHS = 0)
+     
+
+---- eq7  =E=  same request flow conservation
+
+eq7(1,1,A)..  y(A,B,1,1) + y(A,D,1,1) + y(A,E,1,1) =E= 0 ; (LHS = 0)
+     
+eq7(1,1,C)..  - y(B,C,1,1) + y(C,G,1,1) - y(F,C,1,1) =E= 0 ; (LHS = 0)
+     
+eq7(1,1,D)..  - y(A,D,1,1) + y(D,E,1,1) + y(D,H,1,1) =E= 0 ; (LHS = 0)
+     
+eq7(1,1,G)..  - y(C,G,1,1) - y(F,G,1,1) - y(J,G,1,1) =E= 0 ; (LHS = 0)
+     
+eq7(1,1,H)..  - y(D,H,1,1) + y(H,E,1,1) + y(H,I,1,1) =E= 0 ; (LHS = 0)
+     
+eq7(1,1,J)..  - y(F,J,1,1) - y(I,J,1,1) + y(J,G,1,1) =E= 0 ; (LHS = 0)
+     
+eq7(1,2,A)..  y(A,B,1,2) + y(A,D,1,2) + y(A,E,1,2) =E= 0 ; (LHS = 0)
+     
+eq7(1,2,B)..  - y(A,B,1,2) + y(B,C,1,2) + y(B,E,1,2) + y(B,F,1,2) =E= 0 ; (LHS = 0)
+     
+eq7(1,2,C)..  - y(B,C,1,2) + y(C,G,1,2) - y(F,C,1,2) =E= 0 ; (LHS = 0)
+     
+eq7(1,2,G)..  - y(C,G,1,2) - y(F,G,1,2) - y(J,G,1,2) =E= 0 ; (LHS = 0)
+     
+REMAINING 24 ENTRIES SKIPPED
+
+
+---- eq8  =L=  x>y
+
+eq8(A,B,1,1)..  - x(A,B,1) + y(A,B,1,1) =L= 0 ; (LHS = 0)
+     
+eq8(A,B,1,2)..  - x(A,B,1) + y(A,B,1,2) =L= 0 ; (LHS = 0)
+     
+eq8(A,B,1,3)..  - x(A,B,1) + y(A,B,1,3) =L= 0 ; (LHS = 0)
+     
+eq8(A,B,2,1)..  - x(A,B,2) + y(A,B,2,1) =L= 0 ; (LHS = 0)
+     
+eq8(A,B,2,2)..  - x(A,B,2) + y(A,B,2,2) =L= 0 ; (LHS = 0)
+     
+eq8(A,B,2,3)..  - x(A,B,2) + y(A,B,2,3) =L= 0 ; (LHS = 0)
+     
+eq8(A,D,1,1)..  - x(A,D,1) + y(A,D,1,1) =L= 0 ; (LHS = 0)
+     
+eq8(A,D,1,2)..  - x(A,D,1) + y(A,D,1,2) =L= 0 ; (LHS = 0)
+     
+eq8(A,D,1,3)..  - x(A,D,1) + y(A,D,1,3) =L= 0 ; (LHS = 0)
+     
+eq8(A,D,2,1)..  - x(A,D,2) + y(A,D,2,1) =L= 0 ; (LHS = 0)
+     
+REMAINING 110 ENTRIES SKIPPED
+
+
+---- eq9  =L=  vehicle capacity is respected
+
+eq9(A,B,1)..  - 6*x(A,B,1) + 3*y(A,B,1,1) + 2*y(A,B,1,2) + 4*y(A,B,1,3) =L= 0 ; (LHS = 0)
+     
+eq9(A,B,2)..  - 3*x(A,B,2) + 3*y(A,B,2,1) + 2*y(A,B,2,2) + 4*y(A,B,2,3) =L= 0 ; (LHS = 0)
+     
+eq9(A,D,1)..  - 6*x(A,D,1) + 3*y(A,D,1,1) + 2*y(A,D,1,2) + 4*y(A,D,1,3) =L= 0 ; (LHS = 0)
+     
+eq9(A,D,2)..  - 3*x(A,D,2) + 3*y(A,D,2,1) + 2*y(A,D,2,2) + 4*y(A,D,2,3) =L= 0 ; (LHS = 0)
+     
+eq9(A,E,1)..  - 6*x(A,E,1) + 3*y(A,E,1,1) + 2*y(A,E,1,2) + 4*y(A,E,1,3) =L= 0 ; (LHS = 0)
+     
+eq9(A,E,2)..  - 3*x(A,E,2) + 3*y(A,E,2,1) + 2*y(A,E,2,2) + 4*y(A,E,2,3) =L= 0 ; (LHS = 0)
+     
+eq9(B,C,1)..  - 6*x(B,C,1) + 3*y(B,C,1,1) + 2*y(B,C,1,2) + 4*y(B,C,1,3) =L= 0 ; (LHS = 0)
+     
+eq9(B,C,2)..  - 3*x(B,C,2) + 3*y(B,C,2,1) + 2*y(B,C,2,2) + 4*y(B,C,2,3) =L= 0 ; (LHS = 0)
+     
+eq9(B,E,1)..  - 6*x(B,E,1) + 3*y(B,E,1,1) + 2*y(B,E,1,2) + 4*y(B,E,1,3) =L= 0 ; (LHS = 0)
+     
+eq9(B,E,2)..  - 3*x(B,E,2) + 3*y(B,E,2,1) + 2*y(B,E,2,2) + 4*y(B,E,2,3) =L= 0 ; (LHS = 0)
+     
+REMAINING 30 ENTRIES SKIPPED
+
+GAMS 25.1.2  r67455 Released Aug  1, 2018 DEX-DEG x86 64bit/Mac OS X - 11/20/18 17:51:11 Page 3
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Column Listing      SOLVE transport Using MIP From line 102
+
+
+---- x  if a car K travels in arc A
+
+x(A,B,1)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -1       cost
+        1       eq1(A,1)
+        1       eq2(A,G,1)
+       -1       eq3(B,1)
+       -1       eq8(A,B,1,1)
+       -1       eq8(A,B,1,2)
+       -1       eq8(A,B,1,3)
+       -6       eq9(A,B,1)
+
+x(A,B,2)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -3       cost
+        1       eq1(A,2)
+        1       eq2(A,G,2)
+       -1       eq3(B,2)
+       -1       eq8(A,B,2,1)
+       -1       eq8(A,B,2,2)
+       -1       eq8(A,B,2,3)
+       -3       eq9(A,B,2)
+
+x(A,D,1)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+       -2       cost
+        1       eq1(A,1)
+        1       eq2(A,G,1)
+       -1       eq3(D,1)
+       -1       eq8(A,D,1,1)
+       -1       eq8(A,D,1,2)
+       -1       eq8(A,D,1,3)
+       -6       eq9(A,D,1)
+
+REMAINING 37 ENTRIES SKIPPED
+
+---- y  if a car K travels in arc A carries order R
+
+y(A,B,1,1)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+        1       eq7(1,1,A)
+        1       eq8(A,B,1,1)
+        3       eq9(A,B,1)
+
+y(A,B,1,2)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+        1       eq7(1,2,A)
+       -1       eq7(1,2,B)
+        1       eq8(A,B,1,2)
+        2       eq9(A,B,1)
+
+y(A,B,1,3)
+                (.LO, .L, .UP, .M = 0, 0, 1, 0)
+        1       eq7(1,3,A)
+       -1       eq7(1,3,B)
+        1       eq8(A,B,1,3)
+        4       eq9(A,B,1)
+
+REMAINING 117 ENTRIES SKIPPED
+
+---- obj  total cost
+
+obj
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       cost
+
+GAMS 25.1.2  r67455 Released Aug  1, 2018 DEX-DEG x86 64bit/Mac OS X - 11/20/18 17:51:11 Page 4
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Model Statistics    SOLVE transport Using MIP From line 102
+
+
+MODEL STATISTICS
+
+BLOCKS OF EQUATIONS          10     SINGLE EQUATIONS          230
+BLOCKS OF VARIABLES           3     SINGLE VARIABLES          161
+NON ZERO ELEMENTS           769     DISCRETE VARIABLES        160
+
+
+GENERATION TIME      =        0.005 SECONDS      4 MB  25.1.2 r67455 DEX-DEG
+
+
+EXECUTION TIME       =        0.005 SECONDS      4 MB  25.1.2 r67455 DEX-DEG
+GAMS 25.1.2  r67455 Released Aug  1, 2018 DEX-DEG x86 64bit/Mac OS X - 11/20/18 17:51:11 Page 5
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Solution Report     SOLVE transport Using MIP From line 102
+
+
+               S O L V E      S U M M A R Y
+
+     MODEL   transport           OBJECTIVE  obj
+     TYPE    MIP                 DIRECTION  MINIMIZE
+     SOLVER  CPLEX               FROM LINE  102
+
+**** SOLVER STATUS     1 Normal Completion         
+**** MODEL STATUS      1 Optimal                   
+**** OBJECTIVE VALUE               15.0000
+
+ RESOURCE USAGE, LIMIT          0.014      1000.000
+ ITERATION COUNT, LIMIT        19    2000000000
+
+IBM ILOG CPLEX   25.1.2 r67455 Released Aug  1, 2018 DEG x86 64bit/Mac OS X   
+--- GAMS/Cplex licensed for continuous and discrete problems.
+Cplex 12.8.0.0
+
+Space for names approximately 0.01 Mb
+Use option 'names no' to turn use of names off
+MIP status(101): integer optimal solution
+Cplex Time: 0.01sec (det. 1.35 ticks)
+Fixing integer variables, and solving final LP...
+Fixed MIP status(1): optimal
+Cplex Time: 0.00sec (det. 0.15 ticks)
+Proven optimal solution.
+
+MIP Solution:           15.000000    (19 iterations, 0 nodes)
+Final Solve:            15.000000    (0 iterations)
+
+Best possible:          15.000000
+Absolute gap:            0.000000
+Relative gap:            0.000000
+
+
+                           LOWER          LEVEL          UPPER         MARGINAL
+
+---- EQU cost                .              .              .             1.0000      
+
+  cost  total cost
+
+---- EQU eq1  each K initiate once from original depot
+
+           LOWER          LEVEL          UPPER         MARGINAL
+
+A.1        -INF            1.0000         1.0000          .          
+A.2        -INF            1.0000         1.0000          .          
+
+---- EQU eq2  each K must end at its end depot
+
+             LOWER          LEVEL          UPPER         MARGINAL
+
+A.G.1          .              .              .              .          
+A.G.2          .              .              .              .          
+
+---- EQU eq3  flow conservation through the nodes
+
+           LOWER          LEVEL          UPPER         MARGINAL
+
+B.1          .              .              .              .          
+B.2          .              .              .              .          
+C.1          .              .              .              .          
+C.2          .              .              .              .          
+D.1          .              .              .              .          
+D.2          .              .              .              .          
+E.1          .              .              .              .          
+E.2          .              .              .              .          
+F.1          .              .              .              .          
+F.2          .              .              .              .          
+H.1          .              .              .              .          
+H.2          .              .              .              .          
+I.1          .              .              .              .          
+I.2          .              .              .              .          
+J.1          .              .              .              .          
+J.2          .              .              .              .          
+
+---- EQU eq4  requests are picked up
+
+           LOWER          LEVEL          UPPER         MARGINAL
+
+1.B         1.0000         1.0000         1.0000          .          
+2.D         1.0000         1.0000         1.0000          .          
+3.E         1.0000         1.0000         1.0000          .          
+
+---- EQU eq5  requests are delivered
+
+           LOWER          LEVEL          UPPER         MARGINAL
+
+1.F         1.0000         1.0000         1.0000          .          
+2.J         1.0000         1.0000         1.0000          .          
+3.C         1.0000         1.0000         1.0000          .          
+
+---- EQU eq6  transshipment node switch
+
+           LOWER          LEVEL          UPPER         MARGINAL
+
+1.E          .              .              .              .          
+1.F        -1.0000        -1.0000        -1.0000          .          
+1.I          .              .              .              .          
+2.E          .              .              .              .          
+2.F          .              .              .              .          
+2.I          .              .              .              .          
+3.E         1.0000         1.0000         1.0000          .          
+3.F          .              .              .              .          
+3.I          .              .              .              .          
+
+---- EQU eq7  same request flow conservation
+
+             LOWER          LEVEL          UPPER         MARGINAL
+
+1.1.A          .              .              .              .          
+1.1.C          .              .              .              .          
+1.1.D          .              .              .              .          
+1.1.G          .              .              .              .          
+1.1.H          .              .              .              .          
+1.1.J          .              .              .              .          
+1.2.A          .              .              .              .          
+1.2.B          .              .              .              .          
+1.2.C          .              .              .              .          
+1.2.G          .              .              .              .          
+1.2.H          .              .              .              .          
+1.3.A          .              .              .              .          
+1.3.B          .              .              .              .          
+1.3.D          .              .              .              .          
+1.3.G          .              .              .              .          
+1.3.H          .              .              .              .          
+1.3.J          .              .              .              .          
+2.1.A          .              .              .              .          
+2.1.C          .              .              .              .          
+2.1.D          .              .              .              .          
+2.1.G          .              .              .              .          
+2.1.H          .              .              .              .          
+2.1.J          .              .              .              .          
+2.2.A          .              .              .              .          
+2.2.B          .              .              .              .          
+2.2.C          .              .              .              .          
+2.2.G          .              .              .              .          
+2.2.H          .              .              .              .          
+2.3.A          .              .              .              .          
+2.3.B          .              .              .              .          
+2.3.D          .              .              .              .          
+2.3.G          .              .              .              .          
+2.3.H          .              .              .              .          
+2.3.J          .              .              .              .          
+
+---- EQU eq8  x>y
+
+               LOWER          LEVEL          UPPER         MARGINAL
+
+A.B.1.1        -INF           -1.0000          .              .          
+A.B.1.2        -INF           -1.0000          .              .          
+A.B.1.3        -INF           -1.0000          .              .          
+A.B.2.1        -INF             .              .              .          
+A.B.2.2        -INF             .              .              .          
+A.B.2.3        -INF             .              .              .          
+A.D.1.1        -INF             .              .              .          
+A.D.1.2        -INF             .              .              .          
+A.D.1.3        -INF             .              .              .          
+A.D.2.1        -INF           -1.0000          .              .          
+A.D.2.2        -INF           -1.0000          .              .          
+A.D.2.3        -INF           -1.0000          .              .          
+A.E.1.1        -INF             .              .              .          
+A.E.1.2        -INF             .              .              .          
+A.E.1.3        -INF             .              .              .          
+A.E.2.1        -INF             .              .              .          
+A.E.2.2        -INF             .              .              .          
+A.E.2.3        -INF             .              .              .          
+B.C.1.1        -INF             .              .              .          
+B.C.1.2        -INF             .              .              .          
+B.C.1.3        -INF             .              .              .          
+B.C.2.1        -INF             .              .              .          
+B.C.2.2        -INF             .              .              .          
+B.C.2.3        -INF             .              .              .          
+B.E.1.1        -INF             .              .              .          
+B.E.1.2        -INF           -1.0000          .              .          
+B.E.1.3        -INF           -1.0000          .              .          
+B.E.2.1        -INF             .              .              .          
+B.E.2.2        -INF             .              .              .          
+B.E.2.3        -INF             .              .              .          
+B.F.1.1        -INF             .              .              .          
+B.F.1.2        -INF             .              .              .          
+B.F.1.3        -INF             .              .              .          
+B.F.2.1        -INF             .              .              .          
+B.F.2.2        -INF             .              .              .          
+B.F.2.3        -INF             .              .              .          
+C.G.1.1        -INF           -1.0000          .              .          
+C.G.1.2        -INF           -1.0000          .              .          
+C.G.1.3        -INF           -1.0000          .              .          
+C.G.2.1        -INF             .              .              .          
+C.G.2.2        -INF             .              .              .          
+C.G.2.3        -INF             .              .              .          
+D.E.1.1        -INF             .              .              .          
+D.E.1.2        -INF             .              .              .          
+D.E.1.3        -INF             .              .              .          
+D.E.2.1        -INF           -1.0000          .              .          
+D.E.2.2        -INF             .              .              .          
+D.E.2.3        -INF           -1.0000          .              .          
+D.H.1.1        -INF             .              .              .          
+D.H.1.2        -INF             .              .              .          
+D.H.1.3        -INF             .              .              .          
+D.H.2.1        -INF             .              .              .          
+D.H.2.2        -INF             .              .              .          
+D.H.2.3        -INF             .              .              .          
+E.F.1.1        -INF             .              .              .          
+E.F.1.2        -INF             .              .              .          
+E.F.1.3        -INF             .              .              .          
+E.F.2.1        -INF             .              .              .          
+E.F.2.2        -INF             .              .              .          
+E.F.2.3        -INF             .              .              .          
+E.I.1.1        -INF           -1.0000          .              .          
+E.I.1.2        -INF             .              .              .          
+E.I.1.3        -INF             .              .              .          
+E.I.2.1        -INF             .              .              .          
+E.I.2.2        -INF           -1.0000          .              .          
+E.I.2.3        -INF           -1.0000          .              .          
+F.C.1.1        -INF           -1.0000          .              .          
+F.C.1.2        -INF           -1.0000          .              .          
+F.C.1.3        -INF             .              .              .          
+F.C.2.1        -INF             .              .              .          
+F.C.2.2        -INF             .              .              .          
+F.C.2.3        -INF             .              .              .          
+F.E.1.1        -INF             .              .              .          
+F.E.1.2        -INF             .              .              .          
+F.E.1.3        -INF             .              .              .          
+F.E.2.1        -INF             .              .              .          
+F.E.2.2        -INF             .              .              .          
+F.E.2.3        -INF             .              .              .          
+F.G.1.1        -INF             .              .              .          
+F.G.1.2        -INF             .              .              .          
+F.G.1.3        -INF             .              .              .          
+F.G.2.1        -INF             .              .              .          
+F.G.2.2        -INF             .              .              .          
+F.G.2.3        -INF             .              .              .          
+F.J.1.1        -INF             .              .              .          
+F.J.1.2        -INF             .              .              .          
+F.J.1.3        -INF             .              .              .          
+F.J.2.1        -INF           -1.0000          .              .          
+F.J.2.2        -INF             .              .              .          
+F.J.2.3        -INF           -1.0000          .              .          
+H.E.1.1        -INF             .              .              .          
+H.E.1.2        -INF             .              .              .          
+H.E.1.3        -INF             .              .              .          
+H.E.2.1        -INF             .              .              .          
+H.E.2.2        -INF             .              .              .          
+H.E.2.3        -INF             .              .              .          
+H.I.1.1        -INF             .              .              .          
+H.I.1.2        -INF             .              .              .          
+H.I.1.3        -INF             .              .              .          
+H.I.2.1        -INF             .              .              .          
+H.I.2.2        -INF             .              .              .          
+H.I.2.3        -INF             .              .              .          
+I.F.1.1        -INF           -1.0000          .              .          
+I.F.1.2        -INF             .              .              .          
+I.F.1.3        -INF             .              .              .          
+I.F.2.1        -INF             .              .              .          
+I.F.2.2        -INF           -1.0000          .              .          
+I.F.2.3        -INF           -1.0000          .              .          
+I.J.1.1        -INF             .              .              .          
+I.J.1.2        -INF             .              .              .          
+I.J.1.3        -INF             .              .              .          
+I.J.2.1        -INF             .              .              .          
+I.J.2.2        -INF             .              .              .          
+I.J.2.3        -INF             .              .              .          
+J.G.1.1        -INF             .              .              .          
+J.G.1.2        -INF             .              .              .          
+J.G.1.3        -INF             .              .              .          
+J.G.2.1        -INF           -1.0000          .              .          
+J.G.2.2        -INF           -1.0000          .              .          
+J.G.2.3        -INF           -1.0000          .              .          
+
+---- EQU eq9  vehicle capacity is respected
+
+             LOWER          LEVEL          UPPER         MARGINAL
+
+A.B.1        -INF           -6.0000          .              .          
+A.B.2        -INF             .              .              .          
+A.D.1        -INF             .              .              .          
+A.D.2        -INF           -3.0000          .              .          
+A.E.1        -INF             .              .              .          
+A.E.2        -INF             .              .              .          
+B.C.1        -INF             .              .              .          
+B.C.2        -INF             .              .              .          
+B.E.1        -INF           -3.0000          .              .          
+B.E.2        -INF             .              .              .          
+B.F.1        -INF             .              .              .          
+B.F.2        -INF             .              .              .          
+C.G.1        -INF           -6.0000          .              .          
+C.G.2        -INF             .              .              .          
+D.E.1        -INF             .              .              .          
+D.E.2        -INF           -1.0000          .              .          
+D.H.1        -INF             .              .              .          
+D.H.2        -INF             .              .              .          
+E.F.1        -INF             .              .              .          
+E.F.2        -INF             .              .              .          
+E.I.1        -INF             .              .              .          
+E.I.2        -INF             .              .              .          
+F.C.1        -INF           -2.0000          .              .          
+F.C.2        -INF             .              .              .          
+F.E.1        -INF             .              .              .          
+F.E.2        -INF             .              .              .          
+F.G.1        -INF             .              .              .          
+F.G.2        -INF             .              .              .          
+F.J.1        -INF             .              .              .          
+F.J.2        -INF           -1.0000          .              .          
+H.E.1        -INF             .              .              .          
+H.E.2        -INF             .              .              .          
+H.I.1        -INF             .              .              .          
+H.I.2        -INF             .              .              .          
+I.F.1        -INF             .              .              .          
+I.F.2        -INF             .              .              .          
+I.J.1        -INF             .              .              .          
+I.J.2        -INF             .              .              .          
+J.G.1        -INF             .              .              .          
+J.G.2        -INF           -3.0000          .              .          
+
+---- VAR x  if a car K travels in arc A
+
+             LOWER          LEVEL          UPPER         MARGINAL
+
+A.B.1          .             1.0000         1.0000         1.0000      
+A.B.2          .              .             1.0000         3.0000      
+A.D.1          .              .             1.0000         2.0000      
+A.D.2          .             1.0000         1.0000         1.0000      
+A.E.1          .              .             1.0000         6.0000      
+A.E.2          .              .             1.0000         3.0000      
+B.C.1          .              .             1.0000         8.0000      
+B.C.2          .              .             1.0000         4.0000      
+B.E.1          .             1.0000         1.0000         1.0000      
+B.E.2          .              .             1.0000         1.0000      
+B.F.1          .              .             1.0000        16.0000      
+B.F.2          .              .             1.0000         3.0000      
+C.G.1          .             1.0000         1.0000         1.0000      
+C.G.2          .              .             1.0000         2.0000      
+D.E.1          .              .             1.0000         2.0000      
+D.E.2          .             1.0000         1.0000         1.0000      
+D.H.1          .              .             1.0000         2.0000      
+D.H.2          .              .             1.0000         1.0000      
+E.F.1          .              .             1.0000        10.0000      
+E.F.2          .              .             1.0000         5.0000      
+E.I.1          .             1.0000         1.0000         2.0000      
+E.I.2          .             1.0000         1.0000         1.0000      
+F.C.1          .             1.0000         1.0000         1.0000      
+F.C.2          .              .             1.0000         2.0000      
+F.E.1          .              .             1.0000         2.0000      
+F.E.2          .              .             1.0000         1.0000      
+F.G.1          .              .             1.0000         6.0000      
+F.G.2          .              .             1.0000         3.0000      
+F.J.1          .              .             1.0000         2.0000      
+F.J.2          .             1.0000         1.0000         1.0000      
+H.E.1          .              .             1.0000         2.0000      
+H.E.2          .              .             1.0000         1.0000      
+H.I.1          .              .             1.0000        12.0000      
+H.I.2          .              .             1.0000        10.0000      
+I.F.1          .             1.0000         1.0000         2.0000      
+I.F.2          .             1.0000         1.0000         1.0000      
+I.J.1          .              .             1.0000         6.0000      
+I.J.2          .              .             1.0000         3.0000      
+J.G.1          .              .             1.0000         4.0000      
+J.G.2          .             1.0000         1.0000         2.0000      
+
+---- VAR y  if a car K travels in arc A carries order R
+
+               LOWER          LEVEL          UPPER         MARGINAL
+
+A.B.1.1          .              .             1.0000         EPS         
+A.B.1.2          .              .             1.0000         EPS         
+A.B.1.3          .              .             1.0000         EPS         
+A.B.2.1          .              .             1.0000         EPS         
+A.B.2.2          .              .             1.0000         EPS         
+A.B.2.3          .              .             1.0000         EPS         
+A.D.1.1          .              .             1.0000         EPS         
+A.D.1.2          .              .             1.0000         EPS         
+A.D.1.3          .              .             1.0000         EPS         
+A.D.2.1          .              .             1.0000         EPS         
+A.D.2.2          .              .             1.0000         EPS         
+A.D.2.3          .              .             1.0000         EPS         
+A.E.1.1          .              .             1.0000         EPS         
+A.E.1.2          .              .             1.0000         EPS         
+A.E.1.3          .              .             1.0000         EPS         
+A.E.2.1          .              .             1.0000         EPS         
+A.E.2.2          .              .             1.0000         EPS         
+A.E.2.3          .              .             1.0000         EPS         
+B.C.1.1          .              .             1.0000         EPS         
+B.C.1.2          .              .             1.0000         EPS         
+B.C.1.3          .              .             1.0000         EPS         
+B.C.2.1          .              .             1.0000         EPS         
+B.C.2.2          .              .             1.0000         EPS         
+B.C.2.3          .              .             1.0000         EPS         
+B.E.1.1          .             1.0000         1.0000         EPS         
+B.E.1.2          .              .             1.0000         EPS         
+B.E.1.3          .              .             1.0000         EPS         
+B.E.2.1          .              .             1.0000         EPS         
+B.E.2.2          .              .             1.0000         EPS         
+B.E.2.3          .              .             1.0000         EPS         
+B.F.1.1          .              .             1.0000         EPS         
+B.F.1.2          .              .             1.0000         EPS         
+B.F.1.3          .              .             1.0000         EPS         
+B.F.2.1          .              .             1.0000         EPS         
+B.F.2.2          .              .             1.0000         EPS         
+B.F.2.3          .              .             1.0000         EPS         
+C.G.1.1          .              .             1.0000         EPS         
+C.G.1.2          .              .             1.0000         EPS         
+C.G.1.3          .              .             1.0000         EPS         
+C.G.2.1          .              .             1.0000         EPS         
+C.G.2.2          .              .             1.0000         EPS         
+C.G.2.3          .              .             1.0000         EPS         
+D.E.1.1          .              .             1.0000         EPS         
+D.E.1.2          .              .             1.0000         EPS         
+D.E.1.3          .              .             1.0000         EPS         
+D.E.2.1          .              .             1.0000         EPS         
+D.E.2.2          .             1.0000         1.0000         EPS         
+D.E.2.3          .              .             1.0000         EPS         
+D.H.1.1          .              .             1.0000         EPS         
+D.H.1.2          .              .             1.0000         EPS         
+D.H.1.3          .              .             1.0000         EPS         
+D.H.2.1          .              .             1.0000         EPS         
+D.H.2.2          .              .             1.0000         EPS         
+D.H.2.3          .              .             1.0000         EPS         
+E.F.1.1          .              .             1.0000         EPS         
+E.F.1.2          .              .             1.0000         EPS         
+E.F.1.3          .              .             1.0000         EPS         
+E.F.2.1          .              .             1.0000         EPS         
+E.F.2.2          .              .             1.0000         EPS         
+E.F.2.3          .              .             1.0000         EPS         
+E.I.1.1          .              .             1.0000         EPS         
+E.I.1.2          .             1.0000         1.0000         EPS         
+E.I.1.3          .             1.0000         1.0000         EPS         
+E.I.2.1          .             1.0000         1.0000         EPS         
+E.I.2.2          .              .             1.0000         EPS         
+E.I.2.3          .              .             1.0000         EPS         
+F.C.1.1          .              .             1.0000         EPS         
+F.C.1.2          .              .             1.0000         EPS         
+F.C.1.3          .             1.0000         1.0000         EPS         
+F.C.2.1          .              .             1.0000         EPS         
+F.C.2.2          .              .             1.0000         EPS         
+F.C.2.3          .              .             1.0000         EPS         
+F.E.1.1          .              .             1.0000         EPS         
+F.E.1.2          .              .             1.0000         EPS         
+F.E.1.3          .              .             1.0000         EPS         
+F.E.2.1          .              .             1.0000         EPS         
+F.E.2.2          .              .             1.0000         EPS         
+F.E.2.3          .              .             1.0000         EPS         
+F.G.1.1          .              .             1.0000         EPS         
+F.G.1.2          .              .             1.0000         EPS         
+F.G.1.3          .              .             1.0000         EPS         
+F.G.2.1          .              .             1.0000         EPS         
+F.G.2.2          .              .             1.0000         EPS         
+F.G.2.3          .              .             1.0000         EPS         
+F.J.1.1          .              .             1.0000         EPS         
+F.J.1.2          .              .             1.0000         EPS         
+F.J.1.3          .              .             1.0000         EPS         
+F.J.2.1          .              .             1.0000         EPS         
+F.J.2.2          .             1.0000         1.0000         EPS         
+F.J.2.3          .              .             1.0000         EPS         
+H.E.1.1          .              .             1.0000         EPS         
+H.E.1.2          .              .             1.0000         EPS         
+H.E.1.3          .              .             1.0000         EPS         
+H.E.2.1          .              .             1.0000         EPS         
+H.E.2.2          .              .             1.0000         EPS         
+H.E.2.3          .              .             1.0000         EPS         
+H.I.1.1          .              .             1.0000         EPS         
+H.I.1.2          .              .             1.0000         EPS         
+H.I.1.3          .              .             1.0000         EPS         
+H.I.2.1          .              .             1.0000         EPS         
+H.I.2.2          .              .             1.0000         EPS         
+H.I.2.3          .              .             1.0000         EPS         
+I.F.1.1          .              .             1.0000         EPS         
+I.F.1.2          .             1.0000         1.0000         EPS         
+I.F.1.3          .             1.0000         1.0000         EPS         
+I.F.2.1          .             1.0000         1.0000         EPS         
+I.F.2.2          .              .             1.0000         EPS         
+I.F.2.3          .              .             1.0000         EPS         
+I.J.1.1          .              .             1.0000         EPS         
+I.J.1.2          .              .             1.0000         EPS         
+I.J.1.3          .              .             1.0000         EPS         
+I.J.2.1          .              .             1.0000         EPS         
+I.J.2.2          .              .             1.0000         EPS         
+I.J.2.3          .              .             1.0000         EPS         
+J.G.1.1          .              .             1.0000         EPS         
+J.G.1.2          .              .             1.0000         EPS         
+J.G.1.3          .              .             1.0000         EPS         
+J.G.2.1          .              .             1.0000         EPS         
+J.G.2.2          .              .             1.0000         EPS         
+J.G.2.3          .              .             1.0000         EPS         
+
+                           LOWER          LEVEL          UPPER         MARGINAL
+
+---- VAR obj               -INF           15.0000        +INF             .          
+
+  obj  total cost
+
+
+**** REPORT SUMMARY :        0     NONOPT
+                             0 INFEASIBLE
+                             0  UNBOUNDED
+
+
+EXECUTION TIME       =        0.003 SECONDS      2 MB  25.1.2 r67455 DEX-DEG
+
+
+USER: Eval License Carnegie Mellon University        G180112/0001AS-GEN
+      Dept. of Chemical Engineering                              DC9476
+      License for teaching and research at degree granting institutions
+
+
+**** FILE SUMMARY
+
+Input      /Users/naienh/Documents/GAMSStudio/815/illustration.gms
+Output     /Users/naienh/Documents/GAMSStudio/815/illustration.lst
